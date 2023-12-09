@@ -4,22 +4,25 @@ import (
 	"errors"
 
 	"cloud.google.com/go/storage"
+	"github.com/bukharney/FileServer/configs"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 )
 
 type Server struct {
-	App    *gin.Engine
-	DB     *sqlx.DB
-	Bucket *storage.BucketHandle
+	App     *gin.Engine
+	DB      *sqlx.DB
+	Cfg     *configs.Configs
+	Storage *storage.Client
 }
 
-func NewServer(db *sqlx.DB, bucket *storage.BucketHandle) *Server {
+func NewServer(db *sqlx.DB, cfg *configs.Configs, storage *storage.Client) *Server {
 	return &Server{
-		App:    gin.Default(),
-		DB:     db,
-		Bucket: bucket,
+		App:     gin.Default(),
+		DB:      db,
+		Cfg:     cfg,
+		Storage: storage,
 	}
 }
 

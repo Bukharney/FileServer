@@ -1,6 +1,8 @@
 package entities
 
 import (
+	"context"
+	"io"
 	"mime/multipart"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -14,7 +16,8 @@ type UsersClaims struct {
 }
 
 type FileUsecase interface {
-	Upload(req *FileUploadReq) (FileUploadRes, error)
+	Upload(ctx context.Context, req *FileUploadReq) (FileUploadRes, error)
+	StreamFileUpload(w io.Writer, bucket, object string, file multipart.File) error
 }
 
 type FileRepository interface {

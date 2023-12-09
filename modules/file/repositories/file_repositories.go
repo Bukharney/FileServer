@@ -15,6 +15,5 @@ func NewFileRepo(db *sqlx.DB) entities.FileRepository {
 
 func (f *FileRepo) Upload(req *entities.FileUploadReq) (entities.FileUploadRes, error) {
 	res := entities.FileUploadRes{}
-
 	return res, nil
 }

@@ -15,8 +15,8 @@ func (s *Server) MapHandlers() error {
 	v1 := s.App.Group("/v1")
 	fileGroup := v1.Group("/file")
 	fileRepo := _fileRepo.NewFileRepo(s.DB)
-	fileUsecase := _fileUsecase.NewFileUsecase(fileRepo)
-	_fileController.NewFileControllers(fileGroup, fileUsecase)
+	fileUsecase := _fileUsecase.NewFileUsecase(fileRepo, s.Cfg, s.Storage)
+	_fileController.NewFileControllers(fileGroup, fileUsecase, s.Cfg)
 
 	s.App.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Not Found"})

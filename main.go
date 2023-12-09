@@ -26,6 +26,8 @@ func main() {
 		cfg.PostgreSQL.Username = "postgres"
 		cfg.PostgreSQL.Password = "postgres"
 		cfg.PostgreSQL.Database = "ModX"
+		cfg.GCS.BucketName = "modx-product-image"
+		cfg.GCS.ProjectID = "modx-407403"
 	} else {
 		cfg.URL = os.Getenv("URL")
 		cfg.PostgreSQL.Host = os.Getenv("PGHOST")
@@ -40,7 +42,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	srv := server.NewServer(db)
+	storage, err := databases.NewGoolgeCloudStorage(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	srv := server.NewServer(db, cfg, storage)
 
 	if err := srv.Run(); err != nil {
 		log.Fatal(err)

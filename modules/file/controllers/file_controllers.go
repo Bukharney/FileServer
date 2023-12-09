@@ -3,6 +3,7 @@ package controllers
 import (
 	"net/http"
 
+	"github.com/bukharney/FileServer/configs"
 	"github.com/bukharney/FileServer/middlewares"
 	"github.com/bukharney/FileServer/modules/entities"
 	"github.com/gin-gonic/gin"
@@ -10,12 +11,13 @@ import (
 
 type FileController struct {
 	FileUsecase entities.FileUsecase
+	Cfg         *configs.Configs
 }
 
-func NewFileControllers(r gin.IRoutes, fileUsecase entities.FileUsecase) {
+func NewFileControllers(r gin.IRoutes, fileUsecase entities.FileUsecase, cfg *configs.Configs) {
 	controllers := &FileController{
-
 		FileUsecase: fileUsecase,
+		Cfg:         cfg,
 	}
 
 	r.POST("/upload", controllers.Upload, middlewares.JwtAuthentication())
@@ -44,7 +46,7 @@ func (f *FileController) Upload(c *gin.Context) {
 	files := c.Request.MultipartForm.File["file"]
 	req.File = files
 
-	res, err := f.FileUsecase.Upload(&req)
+	res, err := f.FileUsecase.Upload(c.Request.Context(), &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

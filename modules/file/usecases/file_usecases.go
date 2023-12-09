@@ -1,11 +1,16 @@
 package usecases
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"log"
+	"mime/multipart"
 	"net/http"
-	"os"
+	"time"
 
+	"cloud.google.com/go/storage"
+	"github.com/bukharney/FileServer/configs"
 	"github.com/bukharney/FileServer/modules/entities"
 	"github.com/bukharney/FileServer/utils"
 )
@@ -14,18 +19,57 @@ const MAX_UPLOAD_SIZE = 1024 * 1024 * 20
 
 type FileUsecase struct {
 	FileRepo entities.FileRepository
+	Cfg      *configs.Configs
+	Storage  *storage.Client
 }
 
-func NewFileUsecase(fileRepo entities.FileRepository) entities.FileUsecase {
-	return &FileUsecase{FileRepo: fileRepo}
+func NewFileUsecase(fileRepo entities.FileRepository, cfg *configs.Configs, storage *storage.Client) entities.FileUsecase {
+	return &FileUsecase{
+		FileRepo: fileRepo,
+		Cfg:      cfg,
+		Storage:  storage,
+	}
 }
 
-func (f *FileUsecase) Upload(req *entities.FileUploadReq) (entities.FileUploadRes, error) {
+func (f *FileUsecase) StreamFileUpload(w io.Writer, bucket, object string, file multipart.File) error {
+	// bucket := "bucket-name"
+	// object := "object-name"
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("storage.NewClient: %w", err)
+	}
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(ctx, time.Second*50)
+	defer cancel()
+
+	// Upload an object with storage.Writer.
+	wc := client.Bucket(bucket).Object(object).NewWriter(ctx)
+	wc.ChunkSize = 0 // note retries are not supported for chunk size 0.
+
+	wc.CacheControl = "Cache-Control:no-cache, max-age=0"
+	wc.ContentType = "image/jpeg"
+
+	if _, err = io.Copy(wc, file); err != nil {
+		return fmt.Errorf("io.Copy: %w", err)
+	}
+	// Data can continue to be added to the file until the writer is closed.
+	if err := wc.Close(); err != nil {
+		return fmt.Errorf("Writer.Close: %w", err)
+	}
+	fmt.Fprintf(w, "%v uploaded to %v.\n", object, bucket)
+
+	return nil
+}
+
+func (f *FileUsecase) Upload(ctx context.Context, req *entities.FileUploadReq) (entities.FileUploadRes, error) {
 	res := entities.FileUploadRes{}
 
 	files := req.File
 	FileName := []string{}
 	for _, fileHeader := range files {
+		log.Println(fileHeader.Filename)
 
 		if fileHeader.Size > MAX_UPLOAD_SIZE {
 			return res, fmt.Errorf("file too large")
@@ -55,26 +99,21 @@ func (f *FileUsecase) Upload(req *entities.FileUploadReq) (entities.FileUploadRe
 			return res, fmt.Errorf("error, failed to seek file")
 		}
 
-		fileName := utils.RandomString(16) + ".jpg"
+		fileName := utils.RandomString(16)
 
-		err = os.MkdirAll("./static/products/", os.ModePerm)
+		err = f.StreamFileUpload(
+			log.Writer(),
+			"modx-product-image",
+			fileName,
+			file,
+		)
 		if err != nil {
-			return res, fmt.Errorf("error, failed to create directory")
+			return res, fmt.Errorf("error, failed to upload file" + err.Error())
 		}
 
-		dst, err := os.Create(fmt.Sprintf("./static/products/%s", fileName))
-		if err != nil {
-			return res, fmt.Errorf("error, failed to create file")
-		}
+		file.Close()
 
-		defer dst.Close()
-
-		if _, err := io.Copy(dst, file); err != nil {
-			return res, fmt.Errorf("error, failed to copy file")
-		}
-
-		fileName = "/static/products/" + fileName
-
+		fileName = "https://storage.googleapis.com/modx-product-image/" + fileName
 		FileName = append(FileName, fileName)
 	}
 
@@ -83,5 +122,4 @@ func (f *FileUsecase) Upload(req *entities.FileUploadReq) (entities.FileUploadRe
 	}
 
 	return res, nil
-
 }
